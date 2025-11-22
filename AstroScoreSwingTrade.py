@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 from astropy.time import Time
 from astropy.coordinates import get_body, solar_system_ephemeris, EarthLocation, GeocentricTrueEcliptic
+from astropy.utils.iers import conf
+conf.auto_max_age = None  # Fix for future dates (2025+)
 import astropy.units as u
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
@@ -36,10 +38,10 @@ NATAL_DATA = {
 
 @st.cache_data(ttl=300)  # Cache 5 min for real-time
 def get_planet_positions(t_iso: str, lat: float, lon: float):
-    """Get current/transit ecliptic longitudes using Astropy. Fixed: t_iso str for hashable cache key."""
+    """Get current/transit ecliptic longitudes using Astropy. Fixed: t_iso str for hashable cache key. No Pluto."""
     t = Time(t_iso)
     with solar_system_ephemeris.set('builtin'):
-        planets = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']
+        planets = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune']  # Excl. Pluto (builtin unsupported)
         pos = {}
         location = EarthLocation(lat=lat*u.deg, lon=lon*u.deg)
         for p in planets:
@@ -81,9 +83,9 @@ def compute_natal_positions(natal_key):
     return positions
 
 def aspect_score(natal_pos, transits):
-    """Jensen scoring: Applying aspects to Asc/Sun/Moon/Mars/Jup (0-8° orb)."""
+    """Jensen scoring: Applying aspects to Asc/Sun/Moon/Mars/Jup (0-8° orb). No Pluto."""
     scores = {'jupiter': 2, 'venus': 1, 'sun': 1, 'mercury': 0.5,
-              'mars': -2, 'saturn': -3, 'uranus': -4, 'neptune': -2, 'pluto': -3}
+              'mars': -2, 'saturn': -3, 'uranus': -4, 'neptune': -2}  # Excl. Pluto
     total = 0
     aspects = []  # For display
     
@@ -168,7 +170,7 @@ def draw_astro_wheel(natal_pos, transits, title="Ephemeris Wheel"):
     # Planet symbols
     symbols = {
         'sun': '☉', 'moon': '☽', 'mercury': '☿', 'venus': '♀', 'mars': '♂',
-        'jupiter': '♃', 'saturn': '♄', 'uranus': '♅', 'neptune': '♆', 'pluto': '♇',
+        'jupiter': '♃', 'saturn': '♄', 'uranus': '♅', 'neptune': '♆',
         'asc': 'Asc'
     }
 
@@ -182,7 +184,7 @@ def draw_astro_wheel(natal_pos, transits, title="Ephemeris Wheel"):
                                  name=f"Natal {name}", textfont=dict(size=16)))
 
     # Plot TRANSIT planets (red)
-    for planet, lon in {k: v for k, v in transits.items() if k in ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']}.items():
+    for planet, lon in {k: v for k, v in transits.items() if k in ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune']}.items():
         rad = lon * np.pi / 180
         x, y = 0.85 * np.cos(rad), 0.85 * np.sin(rad)  # Slightly inside
         fig.add_trace(go.Scatter(x=[x], y=[y], mode='text+markers',
@@ -194,7 +196,7 @@ def draw_astro_wheel(natal_pos, transits, title="Ephemeris Wheel"):
     aspect_colors = {0: 'green', 90: 'red', 180: 'red', 120: 'green', 60: 'green'}
     for natal_name, n_lon in natal_pos.items():
         for p, t_lon in transits.items():
-            if p in ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']:
+            if p in ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune']:
                 diff = min(abs(n_lon - t_lon), 360 - abs(n_lon - t_lon))
                 aspect_type = min([a for a in [0,60,90,120,180] if abs(diff - a) <= 8], default=None)
                 if aspect_type:
@@ -293,7 +295,7 @@ if st.button("Calculate 20-30 Day Trend + Wheel"):
         st.dataframe(df_natal, use_container_width=True)
         
         st.subheader("Current Transits (Key Planets)")
-        key_trans = {k.capitalize(): v for k, v in transits.items() if k in ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']}
+        key_trans = {k.capitalize(): v for k, v in transits.items() if k in ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune']}
         df_trans = pd.DataFrame(list(key_trans.items()), columns=["Planet", "Longitude (deg)"])
         st.dataframe(df_trans, use_container_width=True)
 
