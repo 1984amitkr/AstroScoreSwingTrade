@@ -36,13 +36,14 @@ NATAL_DATA = {
 }
 
 @st.cache_data(ttl=300)  # Cache 5 min for real-time
-def get_planet_positions(t, location):
-    """Get current/transit ecliptic longitudes using Astropy."""
+def get_planet_positions(t, lat, lon):
+    """Get current/transit ecliptic longitudes using Astropy. Fixed: lat/lon as separate hashable floats."""
     with solar_system_ephemeris.set('builtin'):
         planets = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']
         pos = {}
+        location = EarthLocation(lat=lat*u.deg, lon=lon*u.deg)
         for p in planets:
-            body = get_body(p, t, location=EarthLocation(lat=location['lat']*u.deg, lon=location['lon']*u.deg))
+            body = get_body(p, t, location=location)
             # Transform to GeocentricTrueEcliptic for tropical longitude
             ecl = body.transform_to(GeocentricTrueEcliptic(obstime=t))
             pos[p] = ecl.lon.deg % 360
@@ -54,13 +55,12 @@ def compute_natal_positions(natal_key):
     if data['positions'] is not None:
         return data['positions']
     t_natal = Time(data['date'])
-    loc = {'lat': data['lat'], 'lon': data['lon']}
-    transits = get_planet_positions(t_natal, loc)
+    transits = get_planet_positions(t_natal, data['lat'], data['lon'])
     
     # Simplified Asc calc (approx; for pro, use full ephemeris)
     obliquity = 23.44  # deg
-    lst = t_natal.sidereal_time('mean', longitude=loc['lon']*u.deg).deg
-    tan_asc = np.sin(lst * np.pi/180) / (np.cos(lst * np.pi/180) * np.sin(obliquity * np.pi/180) + np.tan(loc['lat'] * np.pi/180) * np.cos(obliquity * np.pi/180))
+    lst = t_natal.sidereal_time('mean', longitude=data['lon']*u.deg).deg
+    tan_asc = np.sin(lst * np.pi/180) / (np.cos(lst * np.pi/180) * np.sin(obliquity * np.pi/180) + np.tan(data['lat'] * np.pi/180) * np.cos(obliquity * np.pi/180))
     asc = (np.arctan(tan_asc) * 180/np.pi) % 360
     if np.cos(lst * np.pi/180) < 0:
         asc += 180
@@ -237,9 +237,10 @@ if st.button("Calculate 20-30 Day Trend + Wheel"):
     if market not in NATAL_DATA:
         st.error("Select a valid market.")
     else:
-        loc = {'lat': NATAL_DATA[market]['lat'], 'lon': NATAL_DATA[market]['lon']}
+        lat = NATAL_DATA[market]['lat']
+        lon = NATAL_DATA[market]['lon']
         t_now = Time.now()
-        transits = get_planet_positions(t_now, loc)
+        transits = get_planet_positions(t_now, lat, lon)
         natal_pos = compute_natal_positions(market)
         
         score, aspects = aspect_score(natal_pos, transits)
