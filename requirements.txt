@@ -4,3 +4,4 @@ plotly
 yfinance
 numpy
 pandas
+pyswisseph
