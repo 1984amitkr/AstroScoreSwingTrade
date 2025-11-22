@@ -36,8 +36,9 @@ NATAL_DATA = {
 }
 
 @st.cache_data(ttl=300)  # Cache 5 min for real-time
-def get_planet_positions(t, lat, lon):
-    """Get current/transit ecliptic longitudes using Astropy. Fixed: lat/lon as separate hashable floats."""
+def get_planet_positions(t_iso: str, lat: float, lon: float):
+    """Get current/transit ecliptic longitudes using Astropy. Fixed: t_iso str for hashable cache key."""
+    t = Time(t_iso)
     with solar_system_ephemeris.set('builtin'):
         planets = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']
         pos = {}
@@ -54,8 +55,11 @@ def compute_natal_positions(natal_key):
     data = NATAL_DATA[natal_key]
     if data['positions'] is not None:
         return data['positions']
+    # Pass date str directly for caching
+    transits = get_planet_positions(data['date'], data['lat'], data['lon'])
+    
+    # Create Time for Asc calc (non-cached)
     t_natal = Time(data['date'])
-    transits = get_planet_positions(t_natal, data['lat'], data['lon'])
     
     # Simplified Asc calc (approx; for pro, use full ephemeris)
     obliquity = 23.44  # deg
@@ -240,7 +244,8 @@ if st.button("Calculate 20-30 Day Trend + Wheel"):
         lat = NATAL_DATA[market]['lat']
         lon = NATAL_DATA[market]['lon']
         t_now = Time.now()
-        transits = get_planet_positions(t_now, lat, lon)
+        # Pass iso str for caching
+        transits = get_planet_positions(t_now.iso, lat, lon)
         natal_pos = compute_natal_positions(market)
         
         score, aspects = aspect_score(natal_pos, transits)
