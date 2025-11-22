@@ -5,7 +5,6 @@ from astropy.time import Time
 from astropy.coordinates import get_body, solar_system_ephemeris, EarthLocation, GeocentricTrueEcliptic
 import astropy.units as u
 from datetime import datetime, timedelta
-import yfinance as yf
 import plotly.graph_objects as go
 import warnings
 warnings.filterwarnings('ignore')
@@ -118,8 +117,9 @@ def check_triggers(transits):
     return triggers
 
 def get_price_levels(symbol):
-    """Geometric: Square of 52/90 from recent high/low."""
+    """Geometric: Square of 52/90 from recent high/low. Lazy import yfinance."""
     try:
+        import yfinance as yf
         ticker = yf.Ticker(symbol)
         hist = ticker.history(period='3mo')
         if hist.empty:
@@ -131,6 +131,9 @@ def get_price_levels(symbol):
         sq90_range = sq52_range * (90 / 52)
         levels = {'Support (Sq52)': low, 'Resistance (Sq90)': high + sq90_range - (high - low), 'Current': current}
         return levels
+    except ImportError:
+        st.warning("yfinance or dependencies (e.g., websockets) not available. Geo levels skipped.")
+        return None
     except Exception as e:
         st.warning(f"Price fetch failed: {e}. Using defaults.")
         return None
@@ -295,4 +298,4 @@ if st.button("Calculate 20-30 Day Trend + Wheel"):
         st.dataframe(df_trans, use_container_width=True)
 
 st.sidebar.markdown("---")
-st.sidebar.info("For precision, Asc calc is approximate. Use Swiss Ephemeris for pro use. App backtested 75-85% on Nifty. Deploy with requirements.txt!")
+st.sidebar.info("For precision, Asc calc is approximate. Use Swiss Ephemeris for pro use. App backtested 75-85% on Nifty. Deploy with requirements.txt including 'websockets' for full yfinance support!")
